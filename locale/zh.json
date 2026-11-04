@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "title": "上下文管家",
+    "description": "上下文预算工具与增量自动压缩：查看占用、检索被压缩的历史、按序号取回原文、由模型主动折叠旧对话；长会话更省 token，且信息不会丢。"
+  },
+  "ui": {
+    "panel": "上下文管家",
+    "title": "上下文管家",
+    "subtitle": "托管会话的上下文预算、折叠节省与自动折叠状态",
+    "refresh": "刷新",
+    "refreshing": "刷新中…",
+    "loading": "正在读取…",
+    "updated": "更新于 {time}",
+    "autoRefresh": "每 3 秒自动刷新",
+    "errorLoad": "读取失败：{message}",
+    "emptyTitle": "还没有运行中的会话",
+    "emptyHint": "打开一个会话后，这里会显示它的上下文占用和折叠节省。",
+    "summarySessions": "托管会话",
+    "summaryPressure": "总压力",
+    "summarySaved": "总节省",
+    "summaryCache": "平均缓存命中率",
+    "colSession": "会话",
+    "colPreset": "预设",
+    "colContext": "上下文占用",
+    "colSaved": "已压缩节省",
+    "colFolds": "自动折叠",
+    "colSkip": "最近跳过原因",
+    "note": "只折叠可恢复的旧历史；原文仍可用 context_search / context_restore 找回。",
+    "unknown": "—",
+    "foldsCount": "{count} 次",
+    "savedUnit": "tokens",
+    "cacheHint": "缓存读取 / 计费输入"
+  }
+}

@@ -1,0 +1,10 @@
+# dsh-context-keeper bundle layer.
+#
+# A single Host plugin row. The plugin decorates every top-level Agent at
+# `agent/created` (and every already-live Agent when it loads): it registers
+# model-facing context tools inside that Agent's scope and, when configured, a
+# scoped `agent/pre-step` listener that folds old history incrementally through
+# the session's own compaction service (`ctx.compaction`).
+- insert:
+    - id: dsh-context-keeper
+      name: dsh-context-keeper

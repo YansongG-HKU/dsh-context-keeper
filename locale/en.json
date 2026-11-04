@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "title": "Context Keeper",
+    "description": "Context budget tools and incremental auto-compaction: status, search over compacted history, exact restore, and model-driven folding that keeps long sessions cheap without losing information."
+  },
+  "ui": {
+    "panel": "Context Keeper",
+    "title": "Context Keeper",
+    "subtitle": "Context budget, folding savings, and auto-fold state for managed sessions",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "loading": "Loading…",
+    "updated": "Updated {time}",
+    "autoRefresh": "Auto-refreshes every 3 s",
+    "errorLoad": "Failed to load: {message}",
+    "emptyTitle": "No running sessions yet",
+    "emptyHint": "Open a session and its context usage and folding savings appear here.",
+    "summarySessions": "Managed sessions",
+    "summaryPressure": "Total pressure",
+    "summarySaved": "Total saved",
+    "summaryCache": "Avg cache hit",
+    "colSession": "Session",
+    "colPreset": "Preset",
+    "colContext": "Context usage",
+    "colSaved": "Saved by folding",
+    "colFolds": "Auto folds",
+    "colSkip": "Last skip reason",
+    "note": "Only recoverable old history is folded; originals remain retrievable with context_search / context_restore.",
+    "unknown": "—",
+    "foldsCount": "{count}",
+    "savedUnit": "tokens",
+    "cacheHint": "cache read / billed input"
+  }
+}
