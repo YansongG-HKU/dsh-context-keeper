@@ -5,18 +5,18 @@ This directory holds an **offline, test-only copy** of the DSH runtime packages 
 ## What is here
 
 - `package.json` — the vendoring manifest. It is `private`, is never published, and records:
-  - `dshRuntime`: the DSH runtime line the tree was copied from (`0.2.1-rc.5`),
+  - `dshRuntime`: the DSH runtime line the tree was copied from (`0.2.2-rc.1`),
   - `vendoredAt`: the date of the copy,
   - `dependencies`: **exact** versions (no semver ranges) of every vendored package.
-- `node_modules/` — the vendored dependency tree: **21 packages**, copied from a real DSH 0.2.1-rc.5 installation. npm does not install it; tests import it directly by relative URL.
+- `node_modules/` — the vendored dependency tree: **21 packages**, copied from a real DSH 0.2.2-rc.1 installation. npm does not install it; tests import it directly by relative URL.
 
 Packages in the tree:
 
 | Group | Packages |
 | --- | --- |
-| Session runtime | `@deepseek-ai/dsh-session` **0.2.1-rc.5**, `dsh-session-format` 0.2.1-rc.5, `dsh-session-format-catalog` 0.2.1-rc.5, the format migration chain `dsh-session-format-v0-to-v1` … `v3-to-v4` (all 0.2.1-rc.5) |
-| DSH services used by the runtime | `dsh-llm`, `dsh-scope`, `dsh-brand`, `dsh-timeout`, `dsh-typert-protocol`, `dsh-compaction-image-offload`, `dsh-util-crypto`, `dsh-util-values` (all 0.2.1-rc.5) |
-| Framework | `@deepseek-ai/cordis` 4.0.5, `@deepseek-ai/cordis-plugin-loader` 1.0.6, `@deepseek-ai/cosmokit` 1.8.6, `@deepseek-ai/schemastery` 3.18.5 |
+| Session runtime | `@deepseek-ai/dsh-session` **0.2.2-rc.1**, `dsh-session-format` 0.2.2-rc.1, `dsh-session-format-catalog` 0.2.2-rc.1, the format migration chain `dsh-session-format-v0-to-v1` … `v3-to-v4` (all 0.2.2-rc.1) |
+| DSH services used by the runtime | `dsh-llm`, `dsh-scope`, `dsh-brand`, `dsh-timeout`, `dsh-typert-protocol`, `dsh-compaction-image-offload`, `dsh-util-crypto`, `dsh-util-values` (all 0.2.2-rc.1) |
+| Framework | `@deepseek-ai/cordis` 4.1.0, `@deepseek-ai/cordis-plugin-loader` 1.1.0, `@deepseek-ai/cosmokit` 1.9.0, `@deepseek-ai/schemastery` 3.19.0 |
 | Validation / schema | `@standard-schema/spec` 1.1.0, `zod` 4.4.3 |
 
 The authoritative list, with exact versions, is in [`package.json`](package.json).

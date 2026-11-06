@@ -4,6 +4,9 @@
 
 [![tests](https://github.com/YansongG-HKU/dsh-context-keeper/actions/workflows/ci.yml/badge.svg)](https://github.com/YansongG-HKU/dsh-context-keeper/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-blue)](package.json)
+
+> **兼容性（DSH 0.2.2-rc.1）**：Host/Client 契约（tools.register / systemPrompt.section / agent/pre-step / slots / locale）在 0.2.1-rc.5 → 0.2.2-rc.1 之间无破坏性变化；测试依赖已同步 vendored 到 0.2.2-rc.1，48/48 通过，真实桌面运行时正常注册工具与面板。
 
 DeepSeek Harness 原生插件：让**长会话真正省 token**，同时**不把模型变笨**。
 
@@ -129,7 +132,7 @@ test/*.test.mjs        纯函数 + 真实 DSH Session + 假服务 + 插件/面�
 test/runtime-format.test.mjs  回归：插件事务后的日志必须通过真实 v4 加载校验（防"历史加载失败"）
 test/verify-live-log.mjs  用真实会话日志重放验证协议与折叠事务
 test/billing-analysis.mjs 逐 step 账单基线统计
-test/vendor/           测试用的 @deepseek-ai/dsh-session 0.2.1-rc.5（与桌面版 DSH 完全同版本）
+test/vendor/           测试用的 @deepseek-ai/dsh-session 0.2.2-rc.1（与桌面版 DSH 完全同版本）
 ```
 
 设计要点：`agent.ctx.tools.register()` 把工具注册进**该 Agent 自己的作用域**，因此不影响子代理、不污染全局工具表；折叠优先走 `ctx.compaction.compactRegion()`，只有当前 preset 的压缩服务被隔离（stock Web/Desktop 就是这样）时才落到同协议的自有事务。
@@ -139,7 +142,7 @@ test/vendor/           测试用的 @deepseek-ai/dsh-session 0.2.1-rc.5（与桌
 ```powershell
 git clone https://github.com/YansongG-HKU/dsh-context-keeper
 cd dsh-context-keeper
-npm test                    # 离线可跑：测试依赖已 vendored（DSH 0.2.1-rc.5 同版本）
+npm test                    # 离线可跑：测试依赖已 vendored（DSH 0.2.2-rc.1 同版本）
 # 用真实会话日志重放验证协议 + 折叠事务（传入逐帧 zstd 解码后的 session JSONL）
 node test/verify-live-log.mjs <path-to-decoded-session.jsonl>
 ```
@@ -154,7 +157,7 @@ v4 加载器会在**每次打开会话时重放** `compaction/summary` 的 `shad
 
 ## 安装（DSH Web/Desktop profile）
 
-前提：DSH 0.2.1-rc.5 或更新（会话格式 v4）；Node.js ≥ 22（仅测试需要）。
+前提：DSH 0.2.2-rc.1 或更新（会话格式 v4 在 0.2.2 未变，已实测）；Node.js ≥ 22（仅测试需要）。
 
 ```powershell
 git clone https://github.com/YansongG-HKU/dsh-context-keeper

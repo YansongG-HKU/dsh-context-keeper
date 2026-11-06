@@ -74,7 +74,7 @@ To disable auto folding entirely and keep only the tools:
 
 ## Install into a DSH profile
 
-Requirements: DSH 0.2.1-rc.5 or newer (session format v4); Node.js ≥ 22 (tests only).
+Requirements: DSH 0.2.2-rc.1 or newer (session format v4, unchanged in 0.2.2); Node.js ≥ 22 (tests only).
 
 ```bash
 git clone https://github.com/YansongG-HKU/dsh-context-keeper
@@ -100,7 +100,7 @@ After upgrading the plugin code, restart the DSH desktop process: Host JS module
 ## How it works
 
 - **Session log as source of truth.** The plugin reads the append-only log through DSH's own services; a fold is a *compaction transaction*, not a mutation of history. Original events stay in the log, which is why `context_search` and `context_restore` can reach history that is no longer on the surface.
-- **Compaction transaction protocol.** `compaction/start → compaction/summary → user/message(replace) → compaction/end`, with the replace marker `{op: 'replace', startSeq, endSeq}` — exactly three keys — matching the DSH 0.2.1-rc.5 **v4** session format.
+- **Compaction transaction protocol.** `compaction/start → compaction/summary → user/message(replace) → compaction/end`, with the replace marker `{op: 'replace', startSeq, endSeq}` — exactly three keys — matching the DSH 0.2.2-rc.1 **v4** session format.
 - **System-head protection.** The protected system head (the `system/message` surface node — surface node 0, though its log seq is not necessarily 0, because log-only events can precede it) is never allowed inside a folded span. `assertFoldSpan()` validates `shadowedRange` / `shadowedSeqs` and the checkpoint source before the summary is written; the log must then pass the real v4 loader replay. Regression tests replay transactions through the actual v4 validator and `Session.create`.
 - **Checkpoint source kind.** The replacement `user/message` uses a producer-owned `source.kind` (`compact-checkpoint`, with the compaction id). The old `kind: 'plugin'` is rejected by the v4 loader.
 - **Cache-friendly replay.** The summary call replays the same system prompt, tool schemas, and range messages; the folding instruction is appended only at the end. That keeps the prefix hot, exactly like the stock compaction backend.
@@ -128,7 +128,7 @@ An early build folded a 240-step real session and included the **system head at 
 ```bash
 git clone https://github.com/YansongG-HKU/dsh-context-keeper
 cd dsh-context-keeper
-npm test                    # offline: test deps are vendored (same DSH 0.2.1-rc.5 runtime)
+npm test                    # offline: test deps are vendored (same DSH 0.2.2-rc.1 runtime)
 # replay a decoded session log through the protocol + fold transaction
 node test/verify-live-log.mjs <path-to-decoded-session.jsonl>
 ```
@@ -161,7 +161,7 @@ test/*.test.mjs        Pure functions + real DSH Session + fake LLM + plugin/pan
 test/runtime-format.test.mjs  Regression: a transaction's log must pass the real v4 load validation
 test/verify-live-log.mjs      Replay a real session log to verify protocol and fold transactions
 test/billing-analysis.mjs     Per-step billing baseline statistics
-test/vendor/           Vendored test-only DSH 0.2.1-rc.5 dependency tree (see test/vendor/README.md)
+test/vendor/           Vendored test-only DSH 0.2.2-rc.1 dependency tree (see test/vendor/README.md)
 ```
 
 ## Known limitations
@@ -171,7 +171,7 @@ test/vendor/           Vendored test-only DSH 0.2.1-rc.5 dependency tree (see te
 - The four tool schemas cost a fixed ~755 tokens; disable unused tools in configuration.
 - The default auto-fold threshold is conservative for 1M windows; 0.35–0.45 saves more but folds earlier (details remain recoverable).
 - Benchmarks are local replay/simulation on real session logs, not a public benchmark or a production A/B test. No public benchmark is claimed.
-- Verified against DSH 0.2.1-rc.5 (session format v4). A future session-format change will need a retest and possibly a transaction update.
+- Verified against DSH 0.2.2-rc.1 (session format v4, unchanged since 0.2.1-rc.5). A future session-format change will need a retest and possibly a transaction update.
 
 ## License
 
