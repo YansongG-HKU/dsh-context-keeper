@@ -193,5 +193,6 @@ git clone https://github.com/YansongG-HKU/dsh-context-keeper
 
 MIT，见 [LICENSE](LICENSE)。摘要提示词沿用 DSH 官方 `dsh-compaction-basic`（MIT）；`test/vendor/` 内 vendored 的测试依赖均为各自 MIT 许可，见 [test/vendor/README.md](test/vendor/README.md)。
 
+### 正则搜索的执行限制
 
-
+`context_search` 的正则模式在独立 Worker 中运行，包含启动在内最多等待 1 秒。同一 Host 最多同时运行 2 项正则搜索，支持调用方取消。超时或繁忙时可简化表达式或使用关键词。见 [#3](https://github.com/YansongG-HKU/dsh-context-keeper/issues/3)。

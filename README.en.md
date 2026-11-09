@@ -178,3 +178,7 @@ test/vendor/           Vendored test-only DSH 0.2.2-rc.1 dependency tree (see te
 Released under the [MIT License](LICENSE). Copyright (c) YansongG-HKU.
 
 The summary prompt follows DSH's official `dsh-compaction-basic` (MIT). The test dependencies vendored under `test/vendor/` are each MIT-licensed; see [test/vendor/README.md](test/vendor/README.md).
+
+### Regular expression search limits
+
+`context_search` runs regular expressions in a worker with a one-second budget including startup. A host can run up to two regex searches concurrently. Callers can cancel a search. Try a simpler expression or a keyword if the search times out or the workers are busy. See [#3](https://github.com/YansongG-HKU/dsh-context-keeper/issues/3).
