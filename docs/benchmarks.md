@@ -4,6 +4,14 @@ All numbers below were measured on **2026-11-04** against a real DSH desktop ins
 
 Session ids are truncated, and installation details are omitted on purpose. These are **local measurements on real session logs, not a public benchmark and not a production A/B test**. Read the caveats at the end before quoting any number.
 
+## Fold planner stress test (2026-11-10)
+
+The synthetic session has 5,000 surface nodes at 10 tokens each. A tool call at node 100 is answered in the retained tail. Over 30 measured runs after five warmups on Windows / Node 24.14.1, planner p95 fell from 123.64 ms to 0.19 ms and event reads per plan fell from 12,492,551 to 5,000. The selected end remains node 99. This measures fold planning CPU work. The same fixture checks the event-read bound in `npm test`. See [#1](https://github.com/YansongG-HKU/dsh-context-keeper/issues/1).
+
+## Status preview stress test (2026-11-10)
+
+A synthetic status view with 2,000 large tool results measured p95 of 743.273 ms before and 2.403 ms after delaying text extraction until the top eight token-ranked rows were selected. Windows / Node 24.14.1, 25 measured runs after five warmups. This measures status building in Node. The session and meter are fixtures. See [#2](https://github.com/YansongG-HKU/dsh-context-keeper/issues/2).
+
 ## TL;DR
 
 - **One fold** lowers single-session context pressure by **71.6% (keep 100K verbatim) to 86.5% (keep 30K verbatim)**; in real sessions, each following step then pays about **326K–512K fewer tokens**.

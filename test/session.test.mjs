@@ -133,3 +133,52 @@ test('an abandoned summary (no landed replacement) is not counted as savings', a
   assert.equal(stats.netSavedTokens, 0)
 })
 
+
+test('fold planning finds the latest safe boundary with a single scan', () => {
+  const size = 5000
+  const nodes = Array.from({ length: size }, (_, seq) => ({ seq, tokens: 10, heuristicTokens: 10 }))
+  const events = nodes.map(({ seq }) => ({ type: seq === 0 ? 'system/message' : 'user/message', data: {} }))
+  const call = { type: 'assistant/message', data: { content: [{ type: 'tool-call', id: 'pending' }] } }
+  events[100] = call
+  events[size - 1] = { type: 'tool/result', data: { source: { callId: 'pending' } } }
+  let reads = 0
+  const session = {
+    surface: { nodes: nodes.map(({ seq }) => seq) },
+    eventAt(seq) {
+      reads += 1
+      return events[seq]
+    },
+  }
+  const plan = () => selectFoldRange({ session, nodes, retainTokens: 10, minFoldTokens: 1 })
+
+  assert.deepEqual(plan(), {
+    ok: true, startSeq: 1, endSeq: 99, nodes: 99, shadowedTokens: 990, heuristicTokens: 990,
+  })
+  assert.ok(reads <= size, `expected at most ${size} event reads, got ${reads}`)
+
+  events[1] = call
+  assert.deepEqual(plan(), {
+    ok: false, error: 'no balanced older span can be folded without splitting a tool call',
+  })
+})
+
+test('status only extracts the top eight previews in stable meter order', () => {
+  let reads = 0
+  const nodes = Array.from({ length: 20 }, (_, seq) => ({ seq, tokens: seq >= 10 ? 2 : 1 }))
+  const events = nodes.filter(({ seq }) => seq !== 11).map(({ seq }) => ({
+    seq, type: 'tool/result', data: { source: { callId: 'call' }, get content() {
+      reads += 1
+      return [{ type: 'text', text: '  big   result  ' }]
+    } },
+  }))
+  events.push({ seq: 20, type: 'tool/call', data: { callId: 'call', name: 'example' } })
+  const session = { surface: { nodes: nodes.map(({ seq }) => seq) }, snapshotEvents: () => events }
+  const meter = { measure: () => ({ totalTokens: 30, surfaceTokens: 30, nodes }) }
+
+  const { largest } = buildStatus({ agent: { session }, meter })
+  assert.deepEqual(largest.map(({ seq }) => seq), [10, 11, 12, 13, 14, 15, 16, 17])
+  assert.deepEqual(largest[0], { seq: 10, tokens: 2, kind: 'tool', tool: 'example', preview: 'big result' })
+  assert.deepEqual(largest[1], { seq: 11, tokens: 2, kind: 'unknown', preview: '' })
+  assert.equal(reads, 7)
+  assert.equal(nodes[0].seq, 0)
+})
