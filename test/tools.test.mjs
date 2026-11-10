@@ -177,3 +177,38 @@ test('tool errors become structured failures, not thrown exceptions', async () =
 
 
 
+
+
+test('context_search runs regular expressions with the same results as keyword search', async () => {
+  const { byName } = await setup()
+  const search = byName.get('context_search').execute
+  const keyword = await search({ query: 'token-saving' })
+  const regex = await search({ query: 'token[-]saving', regex: true })
+  assert.ok(keyword.total > 0)
+  assert.deepEqual(regex, keyword)
+})
+
+test('context_search bounds a runaway regex, stays responsive, and supports cancellation', async () => {
+  const session = {
+    surface: { nodes: [1] },
+    snapshotEvents: () => [{
+      seq: 1, type: 'user/message', data: { content: [{ type: 'text', text: 'a'.repeat(32) + '!' }] },
+    }],
+  }
+  const tools = createTools({ agent: { session }, cfg: resolveConfig(), state: state() })
+  const search = tools.find(({ name }) => name === 'context_search').execute
+  const query = { query: '^(a+)+$', regex: true }
+  const runaway = search(query)
+  const first = await Promise.race([
+    runaway.then(() => 'search finished'),
+    new Promise((resolve) => setImmediate(() => resolve('host responsive'))),
+  ])
+  assert.equal(first, 'host responsive')
+  assert.match((await runaway).error, /timed out/)
+
+  const controller = new AbortController()
+  const cancelled = search(query, { signal: controller.signal })
+  setImmediate(() => controller.abort())
+  assert.match((await cancelled).error, /abort/i)
+  assert.equal((await search({ query: 'a+!', regex: true })).total, 1)
+})
