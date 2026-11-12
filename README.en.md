@@ -36,10 +36,11 @@ Four tools, fixed in the schema of every request, about **755 tokens** in total 
   "tools": { "status": true, "search": true, "restore": true, "compact": true },
   "autoCompact": {
     "enabled": true,
-    "minPressureRatio": 0.6,   // fold only after 60% of the context window
-    "retainTokens": 30000,     // keep the most recent 30K tokens verbatim
-    "minFoldTokens": 8000,     // spans smaller than this are not worth folding
-    "minGrowthTokens": 20000,  // require this much growth between folds
+    "minPressureRatio": 0.6,        // fold only after 60% of the (capped) context window
+    "maxContextWindowCap": 262144,  // cap on the window used for pressure; 0 = no cap
+    "retainTokens": 30000,          // keep the most recent 30K tokens verbatim
+    "minFoldTokens": 8000,          // spans smaller than this are not worth folding
+    "minGrowthTokens": 20000,       // require this much growth between folds
     "maxFoldsPerTurn": 2
   },
   "includeSubagents": false,
@@ -52,7 +53,7 @@ Four tools, fixed in the schema of every request, about **755 tokens** in total 
 
 ## Configuration
 
-Every knob is optional. Unknown keys fail loudly (so a typo in a bundle patch cannot silently disable the plugin's savings), and numeric ranges are validated — for example `minPressureRatio` must be within 0.2–0.95.
+Every knob is optional. Unknown keys fail loudly (so a typo in a bundle patch cannot silently disable the plugin's savings), and numeric ranges are validated — for example `minPressureRatio` must be within 0.2–0.95 and `maxContextWindowCap` must be a non-negative integer (`0` disables the cap).
 
 Override configuration in the profile's `cordis.patch.yml` by row id (`install_bundle` inserts the row; a patch with the same id overrides it):
 
@@ -83,7 +84,7 @@ git clone https://github.com/YansongG-HKU/dsh-context-keeper
 - **Option A (recommended):** install it through DSH's plugin manager (`plugin_manager` → `install_bundle`, with this repository directory as the bundle target). The manager inserts the bundle layer into the profile's `cordis.patch.yml` — do not hand-edit the profile.
 - **Option B (manual):** do what the plugin manager would do: append `"dsh-context-keeper"` to `dsh.profile.bundles` in the profile's `package.json`, create a junction/symlink from the profile's `node_modules` to this repository directory, then restart DSH.
 
-Any configuration override then goes into a `cordis.patch.yml` row with the same `- id: dsh-context-keeper`, as shown above. For 1M-window sessions, `minPressureRatio: 0.45` is a good starting point.
+Any configuration override then goes into a `cordis.patch.yml` row with the same `- id: dsh-context-keeper`, as shown above. Pressure is measured against the `maxContextWindowCap`-capped window by default (`262144`), so a model that declares a 1M window triggers auto-folding at ≈157K tokens; set `maxContextWindowCap: 0` to measure against the full declared window instead.
 
 After upgrading the plugin code, restart the DSH desktop process: Host JS modules are cached in-process and the Client bundle is wired at startup. Configuration-only changes are picked up through the profile patch.
 
@@ -92,7 +93,7 @@ After upgrading the plugin code, restart the DSH desktop process: Host JS module
 1. **The log is never deleted.** A fold writes `compaction/start → compaction/summary → user/message(replace) → compaction/end`; the original events remain in the session log, so replay, search, and restore still see them.
 2. **Summaries use the official checkpoint prompt.** The same eight-section structural summary instructions and `<compacted-summary>` framing as `dsh-compaction-basic`, so the model sees the checkpoint shape it was already trained to accept.
 3. **Recent history stays verbatim.** The most recent 30K tokens are kept untouched by default; work in progress is never lost.
-4. **Auto folding has guardrails.** It does nothing below 60% of the window by default, requires 20K tokens of growth between folds, and folds at most twice per turn.
+4. **Auto folding has guardrails.** It does nothing below 60% of the capped window by default (`maxContextWindowCap: 262144`), requires 20K tokens of growth between folds, and folds at most twice per turn.
 5. **Native 80% compaction remains the safety net.** This plugin only folds earlier and in smaller spans; the official backend keeps working at its own threshold.
 6. **A summary must be smaller than what it replaces.** Before writing, the framed summary's token count is checked against the replaced span; otherwise the transaction rolls back (recorded as `compaction/end.error`).
 7. **Details are always retrievable.** `context_search` → matched seq → `context_restore` reads the original text, so the model can recover a detail it needs instead of re-exploring.
@@ -105,7 +106,7 @@ After upgrading the plugin code, restart the DSH desktop process: Host JS module
 - **Checkpoint source kind.** The replacement `user/message` uses a producer-owned `source.kind` (`compact-checkpoint`, with the compaction id). The old `kind: 'plugin'` is rejected by the v4 loader.
 - **Cache-friendly replay.** The summary call replays the same system prompt, tool schemas, and range messages; the folding instruction is appended only at the end. That keeps the prefix hot, exactly like the stock compaction backend.
 - **Scoped registration.** `agent.ctx.tools.register()` adds tools inside the Agent's own scope, so subagents and the global tool table stay clean. Folding prefers `ctx.compaction.compactRegion()`; when the preset's compaction service is isolated (as in stock Web/Desktop), it falls back to a transaction with the same protocol.
-- **Incremental auto policy.** Before each step, if measured pressure is at or above `minPressureRatio`, growth since the plugin's last fold is at least `minGrowthTokens`, and the candidate span is at least `minFoldTokens`, the oldest tool-call-balanced span is folded and the recent `retainTokens` are kept verbatim.
+- **Incremental auto policy.** Before each step, if measured pressure is at or above `minPressureRatio` (measured against the `maxContextWindowCap`-capped window, so a huge self-deployed declaration cannot make the threshold unreachable), growth since the plugin's last fold is at least `minGrowthTokens`, and the candidate span is at least `minFoldTokens`, the oldest tool-call-balanced span is folded and the recent `retainTokens` are kept verbatim.
 
 ### A real incident that shaped the design
 
@@ -133,16 +134,18 @@ npm test                    # offline: test deps are vendored (same DSH 0.2.2-rc
 node test/verify-live-log.mjs <path-to-decoded-session.jsonl>
 ```
 
-Currently **48/48 tests pass**, covering configuration validation, event text/search/restore, real `Session` system head / balanced boundaries / fold spans, hiding and restoring after a real compaction, success and failure paths of all four tools, the full event protocol of the plugin's own transactions and the "summary not smaller" rollback, failed transactions excluded from savings, auto policy thresholds/growth/per-turn cap/abort, plugin wiring and subagent skipping, Web panel slot registration/data/same-origin route checks, and **4 v4 load regressions** (`test/runtime-format.test.mjs`): a transaction's log must pass the real v4 format validator and `Session.create` replay, fold spans containing the system head must be rejected before writing, the loader must actually reject a "summary shadows the system head" failure shape, and the checkpoint message source must be `compact-checkpoint`.
+Currently **60/60 tests pass**, covering configuration validation, event text/search/restore, real `Session` system head / balanced boundaries / fold spans, hiding and restoring after a real compaction, success and failure paths of all four tools, the full event protocol of the plugin's own transactions and the "summary not smaller" rollback, failed transactions excluded from savings, auto policy thresholds/growth/per-turn cap/abort, the `maxContextWindowCap` denominator (a declared 1M window → pressure measured against 262144; `0` = no cap), truncated-summary salvage (`max-tokens` with text → commit and mark `truncated: true`; no text or still not smaller → refuse), forwarding the routed `reasoningEffort` to the summary call, plugin wiring and subagent skipping, Web panel slot registration/data/same-origin route checks, and **5 v4 load regressions** (`test/runtime-format.test.mjs`): a transaction's log must pass the real v4 format validator and `Session.create` replay, fold spans containing the system head must be rejected before writing, the loader must actually reject a "summary shadows the system head" failure shape, the checkpoint message source must be `compact-checkpoint`, and a truncated-summary (`truncated: true`) transaction must remain loadable.
 
 Measured savings (full method and tables: [`docs/benchmarks.md`](docs/benchmarks.md)):
 
+> **Basis note:** these measurements/simulations use the **full 1M window, uncapped** (pre-0.1.3 behaviour, `maxContextWindowCap: 0`). Since 0.1.3 the pressure denominator defaults to a `262144` cap, so the 60% threshold is reached at ≈**157K** tokens and auto-folding no longer depends on manually lowering `minPressureRatio`; the old numbers are kept for comparison.
+
 - **One fold in a live session:** pressure 454,619 (43.4% of a 1,048,576 window); folding 489 surface nodes / 325,988 tokens took pressure from 455,577 to ≈130,000 (**-71.5%**), so every following step pays ≈326K fewer tokens.
 - **Real 240-step session** (90,156,133 cumulative billed input, 99.63% cache hit): keeping 30K verbatim folded 549 nodes / 403,901 tokens, pressure 466,617 → 62,817 (**-86.5%**); keeping 100K folded 424 nodes / 334,040 tokens (**-71.6%**).
-- **Multi-step policy simulation** on real billed traces: the default 0.60 threshold never triggered in a 1M window (real peaks 590K / 727K < 629K); `minPressureRatio: 0.45` saved **33.6%** on a 240-step session and **53.2%** on a 668-step session; `0.35` saved **44.5% / 72.8%**.
+- **Multi-step policy simulation** on real billed traces (uncapped): the 0.60 threshold never triggered in a 1M window (real peaks 590K / 727K < 629K) — which is exactly why 0.1.3 added `maxContextWindowCap`; `minPressureRatio: 0.45` saved **33.6%** on a 240-step session and **53.2%** on a 668-step session; `0.35` saved **44.5% / 72.8%**.
 - **Money basis:** DeepSeek cache hits cost 1/50 of misses. Payback is under one step in token terms, but roughly **8–25 steps** in dollar terms.
 
-That last point is the honest caveat: with the conservative default threshold, out-of-the-box savings are ≈0 on a 1M-window session — set `minPressureRatio` to 0.35–0.45 (details are still recoverable via `context_restore`) or let the model call `context_compact` when it makes sense. For a fair, sourced comparison with Anthropic, Claude Code, Cursor, OpenAI, billion-context, and ACON, see [`docs/competitive-landscape.md`](docs/competitive-landscape.md).
+That last point is the honest caveat: those simulation numbers came from the uncapped window. With the 0.1.3 default the 60% threshold is now reachable at ≈157K pressure, so out-of-the-box auto-folding does fire on 1M models; set `maxContextWindowCap: 0` to restore the old full-window ratio, or let the model call `context_compact` when it makes sense. For a fair, sourced comparison with Anthropic, Claude Code, Cursor, OpenAI, billion-context, and ACON, see [`docs/competitive-landscape.md`](docs/competitive-landscape.md).
 
 ## Repository layout
 
@@ -169,7 +172,7 @@ test/vendor/           Vendored test-only DSH 0.2.2-rc.1 dependency tree (see te
 - The plugin's own compaction transaction uses the same protocol and summary prompt as the official backend, but the code is independent; rerun the tests after a DSH upgrade.
 - Subagent sessions are not decorated by default (to avoid adding tool overhead to subtasks); enable with `includeSubagents: true`.
 - The four tool schemas cost a fixed ~755 tokens; disable unused tools in configuration.
-- The default auto-fold threshold is conservative for 1M windows; 0.35–0.45 saves more but folds earlier (details remain recoverable).
+- The pressure denominator is capped by default (`maxContextWindowCap: 262144`), so large (1M) windows fold earlier than their real ratio would imply — that is what makes auto-folding reachable for self-deployed models. Set `maxContextWindowCap: 0` to restore the old full-window behaviour, or raise the cap and lower `minPressureRatio`. Details remain recoverable via `context_restore`.
 - Benchmarks are local replay/simulation on real session logs, not a public benchmark or a production A/B test. No public benchmark is claimed.
 - Verified against DSH 0.2.2-rc.1 (session format v4, unchanged since 0.2.1-rc.5). A future session-format change will need a retest and possibly a transaction update.
 

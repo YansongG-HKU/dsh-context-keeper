@@ -191,12 +191,37 @@ test('resolveConfig applies defaults, merges overrides, and rejects bad input', 
   const defaults = resolveConfig(undefined)
   assert.equal(defaults.autoCompact.enabled, true)
   assert.equal(defaults.autoCompact.minPressureRatio, 0.6)
-  const merged = resolveConfig({ autoCompact: { enabled: false, retainTokens: 12000 }, debug: true })
+  assert.equal(defaults.autoCompact.maxContextWindowCap, 262144)
+  const merged = resolveConfig({ autoCompact: { enabled: false, retainTokens: 12000, maxContextWindowCap: 0 }, debug: true })
   assert.equal(merged.autoCompact.enabled, false)
   assert.equal(merged.autoCompact.retainTokens, 12000)
   assert.equal(merged.autoCompact.minPressureRatio, 0.6)
+  assert.equal(merged.autoCompact.maxContextWindowCap, 0, '0 disables the cap')
   assert.equal(merged.debug, true)
   assert.throws(() => resolveConfig({ nope: 1 }), /unknown config key/)
   assert.throws(() => resolveConfig({ autoCompact: { minPressureRatio: 1.5 } }), /minPressureRatio/)
+  assert.throws(() => resolveConfig({ autoCompact: { maxContextWindowCap: -1 } }), /maxContextWindowCap/)
+  assert.throws(() => resolveConfig({ autoCompact: { maxContextWindowCap: 1024.5 } }), /maxContextWindowCap/)
   assert.throws(() => resolveConfig({ tools: { status: 'yes' } }), /tools.status/)
+})
+
+test('visible-only search reads only eligible message content', () => {
+  let reads = 0
+  const content = [{ type: 'text', text: 'MATCH' }]
+  const events = Array.from({ length: 2000 }, (_, seq) => ({
+    seq, type: 'tool/result', data: { get content() { reads += 1; return content } },
+  }))
+  events.push({ seq: 2000, type: 'compaction/summary', data: { summary: content } })
+  const session = {
+    snapshotEvents: () => events,
+    surface: { nodes: events.slice(-21).map(({ seq }) => seq) },
+  }
+  const options = { session, query: 'match', includeCompacted: false, limit: 2 }
+  const result = searchEvents(options)
+  assert.equal(reads, 20)
+  assert.equal(result.total, 20)
+  assert.deepEqual(result.hits.map(({ seq }) => seq), [1980, 1981])
+  assert.equal(result.truncated, true)
+  assert.deepEqual(searchEvents({ ...options, regex: true }), result)
+  assert.equal(searchEvents({ ...options, includeCompacted: true }).total, 2001)
 })

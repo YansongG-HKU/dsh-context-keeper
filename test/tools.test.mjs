@@ -41,6 +41,16 @@ test('context_status returns the live budget', async () => {
   assert.ok(result.budget.pressureTokens >= 30000)
   assert.ok(result.largest.length > 0)
   assert.ok(meter.state.measureCount > 0)
+  // The resolved policy is exposed so a deployment can verify the new code is
+  // live: the cap comes from config and the effective window from the session
+  // route (declared 200000 < default cap 262144, so both are 200000 here).
+  assert.equal(result.keeper.policy.maxContextWindowCap, 262144)
+  assert.equal(result.keeper.policy.effectiveContextWindow, 200000)
+
+  const capped = await setup({ autoCompact: { maxContextWindowCap: 100000 } })
+  const cappedResult = await capped.byName.get('context_status').execute({}, { signal: signal() })
+  assert.equal(cappedResult.keeper.policy.maxContextWindowCap, 100000)
+  assert.equal(cappedResult.keeper.policy.effectiveContextWindow, 100000, 'the cap bounds the declared window')
 })
 
 test('context_search and context_restore work before and after compaction', async () => {

@@ -6,7 +6,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-blue)](package.json)
 
-> **兼容性（DSH 0.2.2-rc.1）**：Host/Client 契约（tools.register / systemPrompt.section / agent/pre-step / slots / locale）在 0.2.1-rc.5 → 0.2.2-rc.1 之间无破坏性变化；测试依赖已同步 vendored 到 0.2.2-rc.1，48/48 通过，真实桌面运行时正常注册工具与面板。
+> **兼容性（DSH 0.2.2-rc.1）**：Host/Client 契约（tools.register / systemPrompt.section / agent/pre-step / slots / locale）在 0.2.1-rc.5 → 0.2.2-rc.1 之间无破坏性变化；测试依赖已同步 vendored 到 0.2.2-rc.1，60/60 通过，真实桌面运行时正常注册工具与面板。
 
 DeepSeek Harness 原生插件：让**长会话真正省 token**，同时**不把模型变笨**。
 
@@ -39,10 +39,11 @@ DSH 已经自带的省 token 机制**不重复造**：自动压缩（`dsh-compac
   "tools": { "status": true, "search": true, "restore": true, "compact": true },
   "autoCompact": {
     "enabled": true,
-    "minPressureRatio": 0.6,   // 达到上下文窗口的 60% 才自动折叠
-    "retainTokens": 30000,     // 最近 3 万 token 原文保留
-    "minFoldTokens": 8000,     // 太小的一段不值得折叠
-    "minGrowthTokens": 20000,  // 两次折叠之间至少增长这么多
+    "minPressureRatio": 0.6,        // 达到（封顶后）上下文窗口的 60% 才自动折叠
+    "maxContextWindowCap": 262144,  // 压力计算所用窗口上限；0 = 不封顶（默认封顶自部署 1M 窗口）
+    "retainTokens": 30000,          // 最近 3 万 token 原文保留
+    "minFoldTokens": 8000,          // 太小的一段不值得折叠
+    "minGrowthTokens": 20000,       // 两次折叠之间至少增长这么多
     "maxFoldsPerTurn": 2
   },
   "includeSubagents": false,
@@ -76,7 +77,7 @@ DSH 已经自带的省 token 机制**不重复造**：自动压缩（`dsh-compac
 1. **不删日志**：折叠写入 `compaction/start → compaction/summary → user/message(replace) → compaction/end`，原始事件仍在 session log，回放、搜索、恢复都还在。
 2. **摘要用官方 checkpoint 提示词**：沿用 `dsh-compaction-basic` 的八段式结构化摘要指令与 `<compacted-summary>` 框定，模型看到的是它本来就被训练接受过的检查点形态。
 3. **保留近期原文**：默认最近 3 万 token 一字不改，正在做的事不会丢。
-4. **自动折叠有门槛**：默认窗口 60% 以下不动；两次折叠之间要求有 2 万 token 增长；每轮最多 2 次。
+4. **自动折叠有门槛**：默认按封顶后的窗口（`maxContextWindowCap: 262144`）计算，60% 以下不动；两次折叠之间要求有 2 万 token 增长；每轮最多 2 次。
 5. **原生 80% 压缩兜底**：本插件只"更早、更小段"地折叠，不替换官方后端；官方后端仍按自己的阈值工作。
 6. **摘要必须比原文更小**：写盘前校验 framed 摘要 token < 被替换区间 token，否则事务回滚（记录 `compaction/end.error`）。
 7. **需要细节随时取回**：`context_search` → 命中 seq → `context_restore` 读原文，模型可以自己把丢掉的细节找回来。
@@ -85,9 +86,11 @@ DSH 已经自带的省 token 机制**不重复造**：自动压缩（`dsh-compac
 
 **2026-11-04 最新复测**（完整报告：[`docs/benchmarks.md`](docs/benchmarks.md)）：
 
+> **口径说明**：以下实测/仿真均按**真实 1M 窗口、未封顶**计价（0.1.3 之前的行为，`maxContextWindowCap: 0`）。0.1.3 起压力分母默认封顶 `262144`，60% 阈值 ≈ **15.7 万** token 即触发，自动折叠不再需要手动调低 `minPressureRatio`；旧数据保留用于对照。
+
 - 当前实时会话：压力 454,619（窗口 1,048,576，43.4%）；`context_compact --dry-run` 实测折一次 = 489 节点 / **325,988 tokens**，压力 **455,577 → ≈13 万（-71.5%）**，之后每步少付 ≈32.6 万 tokens。
 - 真实长会话 `session-a74…`（240 步，累计账单 90,156,133 tokens，缓存命中 99.63%）：保留 3 万原文折 **549 节点 / 403,901 tokens**，压力 466,617 → 62,817（**-86.5%**）；保留 10 万折 424 节点 / 334,040 tokens，**-71.6%**。
-- **策略仿真**（真实账单轨迹）：默认阈值 0.60 在 1M 窗口下实际 **0 次触发**（真实峰值 59 万/72.7 万 < 63 万）；调 `minPressureRatio: 0.45` → 240 步会话省 **33.6%**、668 步会话省 **53.2%**；调 0.35 → **44.5% / 72.8%**。
+- **策略仿真**（真实账单轨迹，未封顶口径）：阈值 0.60 在 1M 窗口下实际 **0 次触发**（真实峰值 59 万/72.7 万 < 63 万）——这正是 0.1.3 引入 `maxContextWindowCap` 的原因；调 `minPressureRatio: 0.45` → 240 步会话省 **33.6%**、668 步会话省 **53.2%**；调 0.35 → **44.5% / 72.8%**。
 - 金额口径：DeepSeek cache hit = miss 的 1/50，token 口径 <1 步回本，**金额约 8～25 步回本**（折得越狠回本越快）。
 
 `context_status` 在真实会话（`session-a74…`，preset `ptc`，窗口 1,048,576）中的返回（节选，早期读数）：
@@ -114,7 +117,7 @@ DSH 已经自带的省 token 机制**不重复造**：自动压缩（`dsh-compac
 - 客户端代码 `client.js`（手写浏览器插件产物，注册 `sidebar.panellist` 与 `main` 槽）；Host 路由 `lib/panel.js`。
 - 折叠统计只计入**真正落地**的事务：摘要写了但替换没落地的失败事务（例如协议不匹配的那次）不会被算进"已节省"。
 
-含义：该会话每轮实际账单输入 ≈ 1980 万 token 中 98.9% 是缓存命中；一旦把 28 万可折叠历史压成 8k 摘要，后续每轮请求压力从 34 万降到 5 万以内，**缓存命中部分按折后规模计费**，这才是真节省。自动折叠在 1M 窗口下要等到 ~63 万才触发（`minPressureRatio 0.6`），所以默认场景里更多是模型在需要时主动用 `context_compact`。
+含义：该会话每轮实际账单输入 ≈ 1980 万 token 中 98.9% 是缓存命中；一旦把 28 万可折叠历史压成 8k 摘要，后续每轮请求压力从 34 万降到 5 万以内，**缓存命中部分按折后规模计费**，这才是真节省。自动折叠的压力分母默认封顶 `262144`（`maxContextWindowCap`），所以在 1M 窗口下 ≈15.7 万压力就会触发，而不是等到 ~63 万；面板仍按真实窗口显示"上下文占用"，`autoFoldWindow` 字段给出策略实际使用的封顶窗口。
 
 ## 文件与实现
 
@@ -147,7 +150,7 @@ npm test                    # 离线可跑：测试依赖已 vendored（DSH 0.2.
 node test/verify-live-log.mjs <path-to-decoded-session.jsonl>
 ```
 
-当前：**48/48 通过**。覆盖：配置校验、事件文本/搜索/取回、真实 Session 的 system head / 平衡边界 / 折叠范围、真压缩后的隐藏与恢复、四个工具的成功/失败路径、自有事务的完整事件协议与"摘要不更小"回滚、失败事务不计入节省、自动策略的阈值/增长/每轮上限/中止、插件接线与子代理跳过、Web 面板槽注册/数据/路由同源校验；以及 **4 条 v4 加载回归**（`test/runtime-format.test.mjs`）：事务后日志必须通过真实 v4 格式校验与 `Session.create` 回放、含 system 头的折叠范围在写盘前被拒绝、加载器确实拒绝"summary 覆盖 system 头"的故障形态、checkpoint 消息 source 必须是 `compact-checkpoint`。
+当前：**60/60 通过**。覆盖：配置校验、事件文本/搜索/取回、真实 Session 的 system head / 平衡边界 / 折叠范围、真压缩后的隐藏与恢复、四个工具的成功/失败路径、自有事务的完整事件协议与"摘要不更小"回滚、失败事务不计入节省、自动策略的阈值/增长/每轮上限/中止、`maxContextWindowCap` 封顶（声明 1M → 按 262144 计算压力，`0` 不封顶）、截断摘要容错（`max-tokens` 且有文本 → 提交并标 `truncated: true`，无文本或仍不更小 → 拒绝）、摘要调用透传会话路由的 `reasoningEffort`、插件接线与子代理跳过、Web 面板槽注册/数据/路由同源校验；以及 **5 条 v4 加载回归**（`test/runtime-format.test.mjs`）：事务后日志必须通过真实 v4 格式校验与 `Session.create` 回放、含 system 头的折叠范围在写盘前被拒绝、加载器确实拒绝"summary 覆盖 system 头"的故障形态、checkpoint 消息 source 必须是 `compact-checkpoint`、带 `truncated: true` 的截断摘要事务后日志仍可加载。
 
 **协议一致性（2026-11-04 更正）**：桌面版 DSH 0.2.1-rc.5 的会话格式是 **v4**：`dsh-session` 0.2.1-rc.5（app.asar 内 `dsh-desktop` 与 `dsh-session` 均已核实为 0.2.1-rc.5），`system/message` 是 **surface 节点 0**（但它的 log seq 不一定是 0——真实会话里前面可以有 `request/context`、`turn/start` 等 log-only 事件，例如 `session-a74…` 的 system 头在 **seq 15**），替换标记为 `{op:'replace', startSeq, endSeq}`（恰好三个键），`request/header` 不带 system。测试依赖曾经错误地固定在 `0.2.2-alpha.3`（npm 上较新的线），现已改为从**与桌面版完全同版本的 0.2.1-rc.5 完整依赖树离线 vendored**（见 `test/vendor/`），与桌面运行时**完全同版本**。
 
@@ -177,7 +180,8 @@ git clone https://github.com/YansongG-HKU/dsh-context-keeper
   config:
     autoCompact:
       enabled: true
-      minPressureRatio: 0.45   # 1M 窗口建议 0.35–0.45；默认 0.6 偏保守
+      minPressureRatio: 0.45   # 压力按封顶窗口计算（默认 maxContextWindowCap=262144，≈11.8 万触发）
+      maxContextWindowCap: 262144
       retainTokens: 30000
 ```
 
@@ -186,7 +190,7 @@ git clone https://github.com/YansongG-HKU/dsh-context-keeper
 - 自有压缩事务与官方 backend 同协议、同摘要提示词，但**代码独立**；DSH 升级后请重跑测试。
 - 默认不装饰子代理会话（避免给子任务增加工具开销）；需要时 `includeSubagents: true`。
 - 4 个工具 schema 固定约 755 tokens；不用的工具建议在配置里关掉。
-- 自动折叠默认阈值对 1M 窗口偏保守；想更省可把 `minPressureRatio` 调到 0.35–0.45，代价是更早折叠（细节仍可用 `context_restore` 找回）。
+- 压力分母默认封顶 `maxContextWindowCap: 262144`：大窗口（1M）下会较早折叠，这是为了让自部署模型也能触发自动折叠；想严格按真实窗口比例折叠可设 `maxContextWindowCap: 0`（恢复旧行为），或提高 cap 并把 `minPressureRatio` 调低。细节仍可用 `context_restore` 找回。
 - 没有公开基准（benchmark）成绩：`docs/benchmarks.md` 里的是**本地真实会话重放/仿真**，不是线上生产 A/B，也不是与竞品同口径的跑分。
 
 ## License

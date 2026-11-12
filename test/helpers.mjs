@@ -74,12 +74,12 @@ const longText = (label, size) => `${label}: ${'detail '.repeat(Math.ceil(size /
  * two assistant replies. `request/header` carries tools only; the system prompt
  * is a surface `system/message` event.
  */
-export async function makeSession({ contextWindow = 200000 } = {}) {
+export async function makeSession({ contextWindow = 200000, headerConfig = {} } = {}) {
   const Session = await loadSessionClass()
   const session = Session.create(`test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
   const header = {
     header: {
-      config: { provider: 'test-provider', model: 'test-model' },
+      config: { provider: 'test-provider', model: 'test-model', ...headerConfig },
       tools: [{ name: 'read', description: 'Read a file', parameters: { type: 'object', properties: { path: { type: 'string' } } } }],
     },
     reason: 'initial',
@@ -292,14 +292,21 @@ export function makeCompaction(session) {
 /**
  * LLM service stand-in: streams one text block for the summarization call.
  * `summary` controls the checkpoint body; `finish` injects a failure.
+ * `textBeforeFinish` makes a `max-tokens` finish emit the text block first,
+ * mimicking a response cut off after partial output.
  */
-export function makeLlm({ summary = '## Primary Request and Intent\n- build a token-saving plugin\n\n## Next Step\n- fold old history', finish } = {}) {
+export function makeLlm({ summary = '## Primary Request and Intent\n- build a token-saving plugin\n\n## Next Step\n- fold old history', finish, textBeforeFinish = false } = {}) {
   const calls = []
   return {
     calls,
     async *stream(options) {
       calls.push(options)
       if (finish === 'max-tokens') {
+        if (textBeforeFinish) {
+          yield { type: 'block-start', index: 0, blockType: 'text' }
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: summary } }
+          yield { type: 'usage', usage: { inputTokens: 120, outputTokens: 8192, cacheReadTokens: 9000 } }
+        }
         yield { type: 'finish', reason: { kind: 'max-tokens' } }
         return
       }

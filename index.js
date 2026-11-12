@@ -126,14 +126,18 @@ export function apply(ctx, config) {
   // must not affect the model-facing tools.
   let panel
   try {
-    panel = registerPanel(ctx, { stateOf: (agentId) => bindings.get(agentId)?.state ?? null })
+    panel = registerPanel(ctx, {
+      stateOf: (agentId) => bindings.get(agentId)?.state ?? null,
+      cfg,
+    })
   } catch (error) {
     log.warn(`could not register the panel route: ${errorMessage(error)}`)
   }
 
   log.info(
     `active: ${createToolsCount(cfg)} tools, autoCompact=${cfg.autoCompact.enabled}, ` +
-      `threshold=${cfg.autoCompact.minPressureRatio}, retain=${cfg.autoCompact.retainTokens}`,
+      `threshold=${cfg.autoCompact.minPressureRatio}, retain=${cfg.autoCompact.retainTokens}, ` +
+      `windowCap=${cfg.autoCompact.maxContextWindowCap}`,
   )
 
   return () => {

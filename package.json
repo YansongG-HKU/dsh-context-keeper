@@ -1,6 +1,6 @@
 {
   "name": "dsh-context-keeper",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Native DSH context manager: model-facing context tools (status/search/restore/compact) plus incremental, reversible auto-compaction for long sessions.",
   "license": "MIT",
   "author": "YansongG-HKU",

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import { makeAgent, makeMeter, makeSession } from './helpers.mjs'
 import { buildPanelState, registerPanel } from '../lib/panel.js'
+import { resolveConfig } from '../lib/config.js'
 
 const CLIENT_PATH = fileURLToPath(new URL('../client.js', import.meta.url))
 
@@ -81,6 +82,7 @@ test('buildPanelState summarizes live agents for the panel', async () => {
   assert.equal(row.preset, null)
   assert.equal(typeof row.pressureTokens, 'number')
   assert.equal(row.contextWindow, 200000)
+  assert.equal(row.autoFoldWindow, 200000, 'without a cap the policy window equals the declared window')
   assert.ok(row.ratio > 0)
   assert.ok(row.surfaceTokens > 0)
   assert.ok(row.systemTokens > 0, 'system head is priced')
@@ -90,6 +92,13 @@ test('buildPanelState summarizes live agents for the panel', async () => {
   assert.ok(row.steps > 0)
   assert.ok(typeof row.cacheHitRatio === 'number')
   assert.ok(payload.totals.pressureTokens > 0)
+  const capped = buildPanelState(
+    { agents: { list: () => [agent] } },
+    () => state,
+    resolveConfig({ autoCompact: { maxContextWindowCap: 100000 } }),
+  )
+  assert.equal(capped.sessions[0].contextWindow, 200000, 'the declared window is still reported')
+  assert.equal(capped.sessions[0].autoFoldWindow, 100000, 'the capped window drives the auto-fold policy')
 })
 
 test('registerPanel serves a same-origin JSON state route and rejects foreign callers', async () => {

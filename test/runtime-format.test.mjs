@@ -83,6 +83,23 @@ test('a keeper compaction transaction leaves a log the real v4 loader accepts', 
   assert.equal(replay.surface.nodes[0], head, 'the protected system head stays at node 0')
 })
 
+test('a truncated summary row is still a log the real v4 loader accepts', async () => {
+  const session = await makeSession()
+  const surfaceBefore = [...session.surface.nodes]
+  const llm = makeLlm({ finish: 'max-tokens', textBeforeFinish: true })
+  const result = await runCompaction({
+    agent: makeAgent(session, { tokenMeter: makeMeter(), llm }),
+    startSeq: surfaceBefore[1],
+    endSeq: surfaceBefore[Math.min(5, surfaceBefore.length - 2)],
+    meter: makeMeter(),
+    llm,
+  })
+  assert.equal(result.truncated, true)
+  const summary = session.snapshotEvents().find((event) => event.type === 'compaction/summary')
+  assert.equal(summary.data.truncated, true)
+  assertLoadable('fixture after a truncated fold', session)
+})
+
 test('a fold span that includes the protected system head is refused before anything is written', async () => {
   const session = await makeSession()
   const eventsBefore = session.snapshotEvents().length

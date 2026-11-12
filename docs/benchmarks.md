@@ -4,6 +4,8 @@ All numbers below were measured on **2026-11-04** against a real DSH desktop ins
 
 Session ids are truncated, and installation details are omitted on purpose. These are **local measurements on real session logs, not a public benchmark and not a production A/B test**. Read the caveats at the end before quoting any number.
 
+> **v0.1.3 basis change (2026-11-12):** auto-fold pressure is now measured against `autoCompact.maxContextWindowCap` (default `262144`; `0` = uncapped). Everything below was measured with the **full 1M window (uncapped)**, i.e. the pre-0.1.3 default. With the cap, the default 60% threshold is reached at ≈**157K** tokens on a 1M-window model instead of ≈629K, so the "never triggers" caveat no longer applies out of the box. The tables are kept unchanged as the historical baseline.
+
 ## Fold planner stress test (2026-11-10)
 
 The synthetic session has 5,000 surface nodes at 10 tokens each. A tool call at node 100 is answered in the retained tail. Over 30 measured runs after five warmups on Windows / Node 24.14.1, planner p95 fell from 123.64 ms to 0.19 ms and event reads per plan fell from 12,492,551 to 5,000. The selected end remains node 99. This measures fold planning CPU work. The same fixture checks the event-read bound in `npm test`. See [#1](https://github.com/YansongG-HKU/dsh-context-keeper/issues/1).
@@ -17,7 +19,7 @@ A synthetic status view with 2,000 large tool results measured p95 of 743.273 ms
 - **One fold** lowers single-session context pressure by **71.6% (keep 100K verbatim) to 86.5% (keep 30K verbatim)**; in real sessions, each following step then pays about **326K–512K fewer tokens**.
 - **Turned into a multi-step policy** (simulated on the same real billing traces): a 240-step session saves **33.6%–44.5%** of total billed tokens, and a 668-step session saves **53.2%–72.8%**.
 - **Against mature approaches:** Anthropic's -84% refers to *tokens for a whole evaluation workflow*, billion-context's -58.3% / -71.1% is *cost relative to full context*, and ACON's -26–54% is *peak token usage*. The bases all differ — the results are the same order of magnitude ("tens of percent"), but they cannot be put side by side. See [docs/competitive-landscape.md](competitive-landscape.md).
-- **Honest point 1:** with the default 60% threshold, neither real long session triggered even once on a 1M window (peaks 590K / 727K < the 629K threshold). Out of the box, the savings are approximately zero; set `minPressureRatio` to 0.35–0.45, or let the model call `context_compact`.
+- **Honest point 1:** with the default 60% threshold measured against an **uncapped** 1M window, neither real long session triggered even once (peaks 590K / 727K < the 629K threshold). 0.1.3 fixes this by capping the denominator (`maxContextWindowCap: 262144` → ≈157K trigger), so the default now fires without tuning; the simulation below still shows the old uncapped basis, where `minPressureRatio: 0.35–0.45` was needed.
 - **Honest point 2:** DeepSeek cache hits cost 1/50 of misses, so payback is **under one step in token terms but roughly 8–25 steps in dollar terms**. Saving tokens is not the same thing as saving money, and the two must be reported separately.
 
 ## Method
@@ -128,13 +130,13 @@ The exact payback depends on how aggressively a fold is made; across fold sizes 
 
 - **Do not compare the percentages directly.** -84% is whole-workflow token consumption, -58.3% / -71.1% is cost relative to full context (self-run), -26–54% is peak token usage, and this plugin's numbers are single-session pressure and replayed billed tokens.
 - **What can be said:** all of them are in the "tens of percent" range, and Anthropic's result confirms that tool results are the dominant consumer — consistent with what we see in real sessions (single tool outputs around 12K tokens recurring many times).
-- **Differentiation with evidence:** folds are reversible and searchable (unlike Anthropic, Claude Code, Cursor, and OpenAI compaction), and the implementation sits inside DSH's native event protocol without an extra proxy layer (one less failure surface than billion-context). **Trade-offs:** no public benchmark, and the default threshold is conservative for 1M windows. Do not claim to be "better than" these projects; the honest claim is "same order of magnitude, different basis, different trade-offs".
+- **Differentiation with evidence:** folds are reversible and searchable (unlike Anthropic, Claude Code, Cursor, and OpenAI compaction), and the implementation sits inside DSH's native event protocol without an extra proxy layer (one less failure surface than billion-context). **Trade-offs:** no public benchmark, and the historical (uncapped) default threshold was conservative for 1M windows — 0.1.3 caps the pressure denominator so auto-folding triggers. Do not claim to be "better than" these projects; the honest claim is "same order of magnitude, different basis, different trade-offs".
 
 Sources for every competitor number, with links: [docs/competitive-landscape.md](competitive-landscape.md).
 
 ## Honest caveats
 
-1. **The default threshold saves ≈0 on a 1M window.** Both real sessions stayed below 60% until they ended. Tune `minPressureRatio` to 0.45 or 0.35, or rely on model-initiated `context_compact`.
+1. **The historical default threshold saved ≈0 on a 1M window.** Both real sessions stayed below 60% until they ended, because the denominator was the full 1M window. From 0.1.3 the denominator defaults to a `262144` cap (≈157K trigger), which makes the default policy reachable; set `maxContextWindowCap: 0` to restore the old full-window ratio, or tune `minPressureRatio` to 0.45 / 0.35.
 2. **Token savings ≠ money savings.** Because cache hits cost 1/50 of misses, a 33–72% token cut is a much smaller dollar cut. Report both bases separately.
 3. **These are local results.** One live session plus two archived real sessions, replayed on one machine with a fake summary model. This is not a production A/B test, and it is not an independent public benchmark.
 4. **Fold size vs. recall trade-off.** Keeping less verbatim saves more but relies more on summary quality and on `context_restore`; the summaries themselves were not evaluated for quality in this analysis.
