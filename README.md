@@ -6,7 +6,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-blue)](package.json)
 
-> **兼容性（DSH 0.2.2-rc.1）**：Host/Client 契约（tools.register / systemPrompt.section / agent/pre-step / slots / locale）在 0.2.1-rc.5 → 0.2.2-rc.1 之间无破坏性变化；测试依赖已同步 vendored 到 0.2.2-rc.1，60/60 通过，真实桌面运行时正常注册工具与面板。
+> **兼容性（DSH 0.2.2-rc.3，2026-11-15 实测）**：Host/Client 契约（tools.register / systemPrompt.section / agent/pre-step / slots / locale）在 0.2.1-rc.5 → 0.2.2-rc.3 之间无破坏性变化；测试依赖已同步 vendored 到 0.2.2-rc.1，60/60 通过，真实桌面运行时正常注册工具与面板。
 
 DeepSeek Harness 原生插件：让**长会话真正省 token**，同时**不把模型变笨**。
 
@@ -160,7 +160,7 @@ v4 加载器会在**每次打开会话时重放** `compaction/summary` 的 `shad
 
 ## 安装（DSH Web/Desktop profile）
 
-前提：DSH 0.2.2-rc.1 或更新（会话格式 v4 在 0.2.2 未变，已实测）；Node.js ≥ 22（仅测试需要）。
+前提：DSH 0.2.2-rc.3 或更新（会话格式 v4 在 0.2.2 未变，已实测）；Node.js ≥ 22（仅测试需要）。
 
 ```powershell
 git clone https://github.com/YansongG-HKU/dsh-context-keeper

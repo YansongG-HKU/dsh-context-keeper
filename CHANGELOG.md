@@ -3,6 +3,10 @@
 All notable changes to `dsh-context-keeper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.1.4] — 2026-11-15
+
+- Align with DeepSeek Harness 0.2.2-rc.3: `engines.dsh` raised to `>=0.2.2-rc.3`; the session format (v4) and the Host/Client contracts are unchanged from 0.2.2-rc.1. 60/60 tests and `npm run check` pass on the desktop runtime.
+
 ## [0.1.3] — 2026-11-12
 
 - Skip non-visible history before text extraction in visible-only searches. With 2,000 history events and 20 eligible messages, extraction drops from 2,000 to 20. See [#5](https://github.com/YansongG-HKU/dsh-context-keeper/issues/5).
