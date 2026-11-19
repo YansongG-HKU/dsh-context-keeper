@@ -75,7 +75,7 @@ To disable auto folding entirely and keep only the tools:
 
 ## Install into a DSH profile
 
-Requirements: DSH 0.2.2-rc.3 or newer (session format v4, unchanged in 0.2.2); Node.js ≥ 22 (tests only).
+Requirements: DSH 0.2.2-rc.5 or newer (session format v4, unchanged in 0.2.2); Node.js ≥ 22 (tests only).
 
 ```bash
 git clone https://github.com/YansongG-HKU/dsh-context-keeper
@@ -174,7 +174,7 @@ test/vendor/           Vendored test-only DSH 0.2.2-rc.1 dependency tree (see te
 - The four tool schemas cost a fixed ~755 tokens; disable unused tools in configuration.
 - The pressure denominator is capped by default (`maxContextWindowCap: 262144`), so large (1M) windows fold earlier than their real ratio would imply — that is what makes auto-folding reachable for self-deployed models. Set `maxContextWindowCap: 0` to restore the old full-window behaviour, or raise the cap and lower `minPressureRatio`. Details remain recoverable via `context_restore`.
 - Benchmarks are local replay/simulation on real session logs, not a public benchmark or a production A/B test. No public benchmark is claimed.
-- Verified against DSH 0.2.2-rc.3 (session format v4, unchanged since 0.2.1-rc.5). A future session-format change will need a retest and possibly a transaction update.
+- Verified against DSH 0.2.2-rc.5 (session format v4, unchanged since 0.2.1-rc.5). A future session-format change will need a retest and possibly a transaction update.
 
 ## License
 

@@ -3,6 +3,10 @@
 All notable changes to `dsh-context-keeper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.1.5] — 2026-11-19
+
+- Align with DeepSeek Harness 0.2.2-rc.5: `engines.dsh` raised to `>=0.2.2-rc.5`; the session format (v4) and the Host/Client contracts are unchanged from 0.2.2-rc.3, so there is no behaviour change. 60/60 tests pass; the README compatibility lines now name 0.2.2-rc.5.
+
 ## [0.1.4] — 2026-11-15
 
 - Align with DeepSeek Harness 0.2.2-rc.3: `engines.dsh` raised to `>=0.2.2-rc.3`; the session format (v4) and the Host/Client contracts are unchanged from 0.2.2-rc.1. 60/60 tests and `npm run check` pass on the desktop runtime.
